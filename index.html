@@ -3,15 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Katalog Laptop - Jual Beli USU Polmed</title>
+    <title>Katalog Laptop AI - Jual Beli USU Polmed</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- SweetAlert2 (Untuk Popup cantik) -->
+    <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Markdown Parser (Marked) untuk Chat AI -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     
     <script>
         tailwind.config = {
@@ -21,9 +23,13 @@
                         primary: '#6D28D9', // Ungu Utama
                         secondary: '#10B981', // Hijau Aksen
                         dark: '#1F2937',
+                        ai: '#2563EB', // Biru AI
                     },
                     fontFamily: {
                         sans: ['Poppins', 'sans-serif'],
+                    },
+                    animation: {
+                        'bounce-slow': 'bounce 3s infinite',
                     }
                 }
             }
@@ -32,9 +38,22 @@
     <style>
         .hide-scroll::-webkit-scrollbar { display: none; }
         .glass-effect { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
-        /* Animasi Modal */
-        .modal { transition: opacity 0.25s ease; }
-        body.modal-active { overflow-x: hidden; overflow-y: hidden !important; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #6D28D9; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .bg-pattern {
+            background-image: radial-gradient(#6D28D9 0.5px, transparent 0.5px), radial-gradient(#6D28D9 0.5px, #f8fafc 0.5px);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+        }
+        /* Chat UI */
+        .chat-bubble { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 0.85rem; margin-bottom: 8px; line-height: 1.4; }
+        .chat-user { background: #6D28D9; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .chat-ai { background: #F3F4F6; color: #1F2937; align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid #E5E7EB; }
+        .chat-ai strong { font-weight: 700; color: #4B5563; }
+        .typing-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #9CA3AF; animation: typing 1.4s infinite ease-in-out both; margin: 0 2px; }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typing { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
     </style>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800 pb-20">
@@ -43,115 +62,154 @@
     <header class="sticky top-0 z-40 glass-effect border-b border-gray-200 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 py-3">
             <div class="flex items-center justify-between">
-                <!-- Logo -->
                 <div class="flex items-center gap-2">
-                    <div class="bg-gradient-to-br from-primary to-purple-800 text-white p-2 rounded-lg shadow-lg">
+                    <div class="bg-gradient-to-br from-primary to-purple-800 text-white p-2 rounded-lg shadow-lg relative">
                         <i data-lucide="laptop" class="w-5 h-5"></i>
+                        <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-3 w-3 bg-secondary"></span>
+                        </span>
                     </div>
                     <div>
                         <h1 class="text-lg font-bold text-gray-900 leading-tight">Jual Beli <span class="text-primary">USU Polmed</span></h1>
+                        <p class="text-[10px] text-gray-500 font-medium">Powered by Gemini AI ✨</p>
                     </div>
                 </div>
 
-                <!-- Admin Button -->
-                <button onclick="toggleLoginModal()" id="adminBtn" class="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors relative">
-                    <i data-lucide="lock" class="w-5 h-5"></i>
-                </button>
-                <button onclick="logout()" id="logoutBtn" class="hidden text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full font-bold border border-red-200">
-                    Logout Admin
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="toggleLoginModal()" id="adminBtn" class="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors">
+                        <i data-lucide="lock" class="w-5 h-5"></i>
+                    </button>
+                    <button onclick="logout()" id="logoutBtn" class="hidden text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full font-bold border border-red-200">
+                        Logout
+                    </button>
+                </div>
             </div>
 
-            <!-- Search Bar (Visible on Public View) -->
+            <!-- Search -->
             <div id="searchContainer" class="mt-3 relative">
-                <input type="text" id="searchInput" placeholder="Cari laptop (cth: Thinkpad)..." 
-                    class="w-full pl-10 pr-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 bg-gray-50 focus:bg-white transition-all">
+                <input type="text" id="searchInput" placeholder="Cari laptop..." 
+                    class="w-full pl-10 pr-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:border-primary focus:ring-2 bg-gray-50 focus:bg-white transition-all">
                 <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3.5 top-3"></i>
             </div>
         </div>
     </header>
 
-    <!-- ADMIN DASHBOARD (Hidden by Default) -->
+    <!-- ADMIN PANEL -->
     <div id="adminPanel" class="hidden max-w-7xl mx-auto px-4 py-6">
-        <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-800">Panel Admin</h2>
-            <button onclick="openProductModal()" class="bg-secondary hover:bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg transition-transform active:scale-95">
-                <i data-lucide="plus-circle" class="w-5 h-5"></i> Tambah Barang
-            </button>
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+            <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                Panel Admin <span class="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">V2.0 AI</span>
+            </h2>
+            <div class="flex gap-2">
+                <button onclick="importInitialData()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg active:scale-95 transition text-sm">
+                    <i data-lucide="database" class="w-4 h-4"></i> 📥 Import Data
+                </button>
+                <button onclick="openProductModal()" class="bg-secondary hover:bg-emerald-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 shadow-lg active:scale-95 transition text-sm">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i> Tambah
+                </button>
+            </div>
         </div>
         
-        <div class="bg-white rounded-xl shadow border border-gray-200 overflow-hidden">
+        <div class="bg-white rounded-xl shadow overflow-hidden border border-gray-200">
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left">
                     <thead class="bg-gray-100 text-gray-600 uppercase font-bold text-xs">
                         <tr>
-                            <th class="px-4 py-3">Merk & Model</th>
+                            <th class="px-4 py-3">Produk</th>
                             <th class="px-4 py-3">Harga</th>
                             <th class="px-4 py-3 text-center">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody id="adminTableBody" class="divide-y divide-gray-200">
-                        <!-- Data Admin Rendered Here -->
-                    </tbody>
+                    <tbody id="adminTableBody" class="divide-y divide-gray-200"></tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- PUBLIC CATALOG VIEW -->
+    <!-- PUBLIC VIEW -->
     <main id="publicView" class="max-w-7xl mx-auto px-4 py-6">
-        <!-- Category Filters -->
         <div class="mb-6">
-            <div class="flex gap-2 overflow-x-auto hide-scroll pb-2" id="categoryContainer">
-                <!-- Buttons Rendered Here -->
-            </div>
+            <div class="flex gap-2 overflow-x-auto hide-scroll pb-2" id="categoryContainer"></div>
         </div>
 
-        <!-- Product Grid -->
-        <div id="productContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            <!-- Cards Rendered Here -->
+        <div id="loadingIndicator" class="flex justify-center py-20">
+            <div class="loader"></div>
         </div>
 
-        <!-- Empty State -->
+        <div id="productContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 hidden"></div>
+
         <div id="emptyState" class="hidden text-center py-20">
             <i data-lucide="package-open" class="w-12 h-12 text-gray-300 mx-auto mb-2"></i>
-            <p class="text-gray-500">Barang tidak ditemukan.</p>
+            <p class="text-gray-500">Belum ada barang.</p>
         </div>
     </main>
 
-    <!-- LOGIN MODAL -->
-    <div id="loginModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative">
-            <button onclick="toggleLoginModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><i data-lucide="x"></i></button>
-            <h3 class="text-xl font-bold text-center mb-1">Login Admin</h3>
-            <p class="text-center text-gray-500 text-xs mb-6">Kelola katalog Jual Beli USU Polmed</p>
-            
-            <form onsubmit="handleLogin(event)">
-                <div class="mb-4">
-                    <label class="block text-xs font-bold text-gray-700 mb-1">Username</label>
-                    <input type="text" id="usernameInput" class="w-full border rounded-lg px-3 py-2 focus:ring-primary focus:border-primary">
+    <!-- AI CHAT FLOATING BUTTON -->
+    <div class="fixed bottom-5 right-5 z-40">
+        <button onclick="toggleChat()" class="bg-gradient-to-r from-primary to-ai text-white p-4 rounded-full shadow-2xl hover:scale-105 transition-transform flex items-center justify-center relative group">
+            <i data-lucide="sparkles" class="w-6 h-6 animate-pulse"></i>
+            <span class="absolute right-full mr-3 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap">Tanya AI</span>
+        </button>
+    </div>
+
+    <!-- AI CHAT MODAL -->
+    <div id="chatModal" class="fixed bottom-20 right-5 z-40 w-80 md:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 hidden flex-col overflow-hidden transform transition-all origin-bottom-right scale-95 opacity-0" style="height: 500px; max-height: 80vh;">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-primary to-ai p-4 flex items-center justify-between text-white">
+            <div class="flex items-center gap-2">
+                <div class="bg-white/20 p-1.5 rounded-lg">
+                    <i data-lucide="bot" class="w-5 h-5"></i>
                 </div>
-                <div class="mb-6">
-                    <label class="block text-xs font-bold text-gray-700 mb-1">Password</label>
-                    <input type="password" id="passwordInput" class="w-full border rounded-lg px-3 py-2 focus:ring-primary focus:border-primary">
+                <div>
+                    <h3 class="font-bold text-sm">Si Paling Laptop</h3>
+                    <p class="text-[10px] text-white/80">Tanya rekomendasi laptop disini!</p>
                 </div>
-                <button type="submit" class="w-full bg-primary text-white font-bold py-2 rounded-lg shadow hover:bg-purple-800 transition">Masuk</button>
+            </div>
+            <button onclick="toggleChat()" class="hover:bg-white/20 p-1 rounded transition"><i data-lucide="x" class="w-4 h-4"></i></button>
+        </div>
+        <!-- Messages -->
+        <div id="chatMessages" class="flex-grow p-4 overflow-y-auto bg-gray-50 flex flex-col gap-2">
+            <div class="chat-bubble chat-ai">
+                Halo! 👋 Saya asisten AI Jual Beli USU Polmed. Bingung cari laptop? Ceritain aja kebutuhan dan budgetmu, nanti saya carikan dari stok yang ada!
+            </div>
+        </div>
+        <!-- Input -->
+        <div class="p-3 bg-white border-t border-gray-100">
+            <form onsubmit="handleAIChat(event)" class="flex gap-2">
+                <input type="text" id="chatInput" class="flex-grow border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary" placeholder="Cth: Cari laptop 3 jutaan buat kuliah..." required>
+                <button type="submit" id="sendChatBtn" class="bg-primary text-white p-2 rounded-full hover:bg-purple-800 transition disabled:opacity-50">
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                </button>
             </form>
         </div>
     </div>
 
-    <!-- ADD/EDIT PRODUCT MODAL -->
+    <!-- ADMIN MODALS -->
+    <!-- Login -->
+    <div id="loginModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative">
+            <button onclick="toggleLoginModal()" class="absolute top-4 right-4 text-gray-400"><i data-lucide="x"></i></button>
+            <h3 class="text-xl font-bold text-center mb-1">Login Admin</h3>
+            <p class="text-center text-gray-500 text-xs mb-6">Mode Edit Online</p>
+            <form onsubmit="handleLogin(event)">
+                <input type="text" id="usernameInput" class="w-full border rounded-lg px-3 py-2 mb-3" placeholder="Username">
+                <input type="password" id="passwordInput" class="w-full border rounded-lg px-3 py-2 mb-6" placeholder="Password">
+                <button type="submit" class="w-full bg-primary text-white font-bold py-2 rounded-lg shadow">Masuk</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Product Modal with AI -->
     <div id="productModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
-            <button onclick="closeProductModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><i data-lucide="x"></i></button>
-            <h3 id="modalTitle" class="text-xl font-bold mb-6 text-primary">Tambah Barang</h3>
-            
+            <button onclick="closeProductModal()" class="absolute top-4 right-4 text-gray-400"><i data-lucide="x"></i></button>
+            <h3 id="modalTitle" class="text-xl font-bold mb-4 text-primary">Tambah Barang</h3>
             <form onsubmit="saveProduct(event)">
-                <input type="hidden" id="editIndex"> <!-- Hidden Index for Edit Mode -->
-                
-                <div class="grid grid-cols-2 gap-4 mb-4">
+                <input type="hidden" id="editId">
+                <div class="grid grid-cols-2 gap-4 mb-3">
                     <div>
-                        <label class="label-input">Merk (Brand)</label>
+                        <label class="label-input">Merk</label>
                         <select id="inputBrand" class="input-field" required>
                             <option value="Lenovo">Lenovo</option>
                             <option value="Dell">Dell</option>
@@ -170,19 +228,24 @@
                         <input type="number" id="inputPrice" class="input-field" placeholder="cth: 4500000" required>
                     </div>
                 </div>
-
-                <div class="mb-4">
-                    <label class="label-input">Model / Nama Laptop</label>
+                <div class="mb-3">
+                    <label class="label-input">Model / Tipe Laptop</label>
                     <input type="text" id="inputModel" class="input-field" placeholder="cth: ThinkPad T490s" required>
+                </div>
+                
+                <!-- AI AUTOFILL BUTTON -->
+                <div class="flex justify-end mb-2">
+                    <button type="button" onclick="handleAutoFillSpecs()" id="btnAutoFill" class="text-[10px] bg-gradient-to-r from-blue-500 to-purple-600 text-white px-2 py-1 rounded-full flex items-center gap-1 hover:shadow-lg transition transform active:scale-95">
+                        <i data-lucide="sparkles" class="w-3 h-3"></i> Buat Spek Otomatis pakai AI
+                    </button>
                 </div>
 
                 <div class="mb-6">
-                    <label class="label-input">Spesifikasi Lengkap</label>
-                    <textarea id="inputSpecs" rows="4" class="input-field" placeholder="cth: Core i7 Gen 8 • RAM 16GB • SSD 256GB..." required></textarea>
+                    <label class="label-input">Spesifikasi</label>
+                    <textarea id="inputSpecs" rows="4" class="input-field bg-gray-50 focus:bg-white transition-colors" placeholder="Klik tombol AI di atas untuk isi otomatis, atau ketik manual..." required></textarea>
                 </div>
-
-                <button type="submit" class="w-full bg-secondary text-white font-bold py-3 rounded-lg shadow hover:bg-emerald-600 transition flex justify-center items-center gap-2">
-                    <i data-lucide="save" class="w-4 h-4"></i> Simpan Data
+                <button type="submit" id="saveBtn" class="w-full bg-secondary text-white font-bold py-3 rounded-lg shadow flex justify-center items-center gap-2">
+                    <i data-lucide="save" class="w-4 h-4"></i> Simpan ke Database
                 </button>
             </form>
         </div>
@@ -191,72 +254,392 @@
     <style>
         .label-input { display: block; font-size: 0.75rem; font-weight: 700; color: #4B5563; margin-bottom: 0.25rem; }
         .input-field { width: 100%; border: 1px solid #D1D5DB; border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; outline: none; transition: border-color 0.2s; }
-        .input-field:focus { border-color: #6D28D9; ring: 2px; ring-color: rgba(109, 40, 217, 0.2); }
+        .input-field:focus { border-color: #6D28D9; ring: 2px; }
     </style>
 
-    <!-- LOGIC -->
-    <script>
-        // --- DATA DEFAULT (Jika LocalStorage Kosong) ---
-        const defaultProducts = [
-            { brand: "Lenovo", model: "ThinkPad T495", specs: "AMD Ryzen 7 Pro 3700U • RAM 16GB • SSD 256GB • 14\"", price: 4900000 },
-            { brand: "Lenovo", model: "ThinkPad L13 Yoga", specs: "Core i5 Gen 10 • RAM 16GB • SSD 256GB • Touch", price: 4750000 },
-            { brand: "Dell", model: "Latitude 5420", specs: "Core i7 Gen 11 • RAM 16GB • SSD 256GB", price: 5700000 },
-            { brand: "HP", model: "ProBook 430 G7", specs: "Core i7 Gen 10 • RAM 16GB • SSD 256GB • 13.3\"", price: 5450000 },
-            { brand: "Toshiba", model: "Dynabook G83", specs: "Core i3 Gen 10 • RAM 16GB • SSD 256GB", price: 3450000 },
-        ];
+    <!-- FIREBASE & LOGIC -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // --- STATE MANAGEMENT ---
-        let products = JSON.parse(localStorage.getItem('usuPolmedProducts')) || defaultProducts;
-        let isAdmin = false;
-        const nomorWA = "6281234567890"; // GANTI NOMOR WA DISINI
+        // --- GEMINI API SETUP ---
+        const apiKey = ""; // API Key provided by environment
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
-        // --- CORE FUNCTIONS ---
-        
-        function saveToLocal() {
-            localStorage.setItem('usuPolmedProducts', JSON.stringify(products));
-        }
-
-        function formatRupiah(angka) {
-            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
-        }
-
-        // --- AUTH SYSTEM ---
-        function toggleLoginModal() {
-            const modal = document.getElementById('loginModal');
-            modal.classList.toggle('hidden');
-        }
-
-        function handleLogin(e) {
-            e.preventDefault();
-            const u = document.getElementById('usernameInput').value;
-            const p = document.getElementById('passwordInput').value;
-
-            if(u === 'admin' && p === 'bismillah') {
-                isAdmin = true;
-                toggleLoginModal();
-                toggleAdminView();
-                Swal.fire({ icon: 'success', title: 'Login Berhasil', text: 'Selamat datang Admin!', timer: 1500, showConfirmButton: false });
-            } else {
-                Swal.fire({ icon: 'error', title: 'Gagal', text: 'Username atau Password salah!' });
+        async function callGemini(promptText) {
+            try {
+                const response = await fetch(geminiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: promptText }] }]
+                    })
+                });
+                const data = await response.json();
+                return data.candidates?.[0]?.content?.parts?.[0]?.text || "Maaf, AI sedang sibuk.";
+            } catch (error) {
+                console.error("Gemini Error:", error);
+                return "Maaf, terjadi kesalahan koneksi ke AI.";
             }
         }
 
-        function logout() {
-            isAdmin = false;
-            toggleAdminView();
-            Swal.fire({ icon: 'success', title: 'Logout Berhasil', timer: 1000, showConfirmButton: false });
+        // --- FIREBASE CONFIG ---
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const nomorWA = "6281234567890"; 
+
+        // --- GLOBAL VARS ---
+        let products = [];
+        let isAdmin = false;
+
+        // --- AI FEATURES LOGIC ---
+
+        // 1. CHATBOT PINTAR (CUSTOMER)
+        window.toggleChat = () => {
+            const modal = document.getElementById('chatModal');
+            const isHidden = modal.classList.contains('hidden');
+            if (isHidden) {
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modal.classList.remove('scale-95', 'opacity-0');
+                    modal.classList.add('scale-100', 'opacity-100');
+                }, 10);
+            } else {
+                modal.classList.remove('scale-100', 'opacity-100');
+                modal.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => modal.classList.add('hidden'), 300);
+            }
         }
 
-        function toggleAdminView() {
-            const adminPanel = document.getElementById('adminPanel');
+        window.handleAIChat = async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('chatInput');
+            const btn = document.getElementById('sendChatBtn');
+            const messagesDiv = document.getElementById('chatMessages');
+            const userText = input.value.trim();
+            if (!userText) return;
+
+            // Add User Message
+            messagesDiv.innerHTML += `<div class="chat-bubble chat-user">${userText}</div>`;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            input.value = '';
+            input.disabled = true;
+            btn.disabled = true;
+
+            // Add Loading Bubble
+            const loadingId = 'loading-' + Date.now();
+            messagesDiv.innerHTML += `
+                <div id="${loadingId}" class="chat-bubble chat-ai">
+                    <span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>
+                </div>
+            `;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            // Prepare Context (Stok Barang)
+            // Kita ringkas data biar gak kepanjangan buat prompt
+            const stockSummary = products.map(p => `- ${p.brand} ${p.model} (Rp ${p.price}) Spek: ${p.specs}`).join('\n');
+            
+            const prompt = `
+                Peran: Anda adalah asisten penjualan toko laptop "Jual Beli USU Polmed".
+                Konteks: Berikut adalah daftar stok laptop yang TERSEDIA saat ini (jangan rekomendasikan yang tidak ada di list):
+                ${stockSummary}
+                
+                Instruksi:
+                User bertanya: "${userText}"
+                1. Cari laptop dari stok di atas yang paling sesuai dengan kebutuhan/budget user.
+                2. Rekomendasikan 1-3 opsi terbaik.
+                3. Jika tidak ada yang pas harganya, sarankan yang mendekati.
+                4. Jawab dengan gaya bahasa Indonesia yang santai, ramah, dan membantu (seperti abang penjual laptop yang jujur).
+                5. Jangan terlalu panjang, langsung ke poin. Gunakan bold (Markdown) untuk nama laptop dan harga.
+            `;
+
+            // Call AI
+            const aiResponse = await callGemini(prompt);
+
+            // Remove Loading & Add Response
+            document.getElementById(loadingId).remove();
+            messagesDiv.innerHTML += `<div class="chat-bubble chat-ai">${marked.parse(aiResponse)}</div>`;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            
+            input.disabled = false;
+            btn.disabled = false;
+            input.focus();
+        }
+
+        // 2. AUTOFILL SPECS (ADMIN)
+        window.handleAutoFillSpecs = async () => {
+            const brand = document.getElementById('inputBrand').value;
+            const model = document.getElementById('inputModel').value;
+            const btn = document.getElementById('btnAutoFill');
+            const specsArea = document.getElementById('inputSpecs');
+
+            if (!model) {
+                Swal.fire('Info', 'Isi merk dan model dulu ya bos!', 'info');
+                return;
+            }
+
+            // UI Loading
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Mikir...';
+            btn.disabled = true;
+            specsArea.placeholder = "Sedang generate spesifikasi...";
+
+            const prompt = `
+                Berikan spesifikasi teknis singkat untuk laptop bekas "${brand} ${model}".
+                Format output: Teks biasa (bukan list, bukan markdown), pisahkan fitur utama dengan tanda bullet (•).
+                Wajib mencakup: Processor (generasi perkiraan), RAM default, Storage (SSD/HDD), Ukuran Layar, dan satu fitur unik jika ada.
+                Contoh output: Core i5 Gen 8 • RAM 8GB • SSD 256GB • Layar 14 Inch • Fingerprint
+                Jangan sertakan harga. Maksimal 150 karakter.
+            `;
+
+            const result = await callGemini(prompt);
+            
+            // Clean up result (kadang AI ngasih tanda kutip atau enter)
+            let cleanResult = result.replace(/\n/g, " ").replace(/"/g, "").trim();
+            
+            specsArea.value = cleanResult;
+            
+            // UI Reset
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            lucide.createIcons();
+        }
+
+
+        // --- STANDARD APP LOGIC (SAMA SEPERTI SEBELUMNYA) ---
+
+        // Data Awal untuk Import
+        const initialData = [
+            { brand: "Lenovo", model: "ThinkPad T495", specs: "AMD Ryzen 7 Pro 3700U • RAM 16GB • SSD 256GB • VGA 2GB • Screen 14\"", price: 4900000 },
+            { brand: "Lenovo", model: "ThinkPad L13 Yoga", specs: "Core i5 Gen 10 • RAM 16GB • SSD 256GB • 13.3\" • Touchscreen", price: 4750000 },
+            { brand: "Dell", model: "Latitude 7400", specs: "Core i7 Gen 8 • RAM 16GB • SSD 256GB", price: 4500000 },
+            { brand: "HP", model: "EliteBook 840 G6", specs: "Core i5 Gen 8 • RAM 8GB • SSD 256GB • 14 Inch", price: 4200000 },
+            { brand: "Lenovo", model: "ThinkPad X280", specs: "Core i5 Gen 8 • RAM 8GB • SSD 256GB • 12.5 Inch", price: 3800000 },
+             // ... Data lainnya akan diimport jika tombol diklik
+        ];
+
+        async function initApp() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'products'));
+                onSnapshot(q, (snapshot) => {
+                    products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    products.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+                    renderApp();
+                    document.getElementById('loadingIndicator').classList.add('hidden');
+                    document.getElementById('productContainer').classList.remove('hidden');
+                });
+            } catch (error) { console.error("Auth Error", error); }
+        }
+
+        function renderApp() {
+            if (isAdmin) renderAdminTable();
+            else {
+                const activeBtn = document.querySelector('.active-cat');
+                const brand = activeBtn ? activeBtn.textContent : 'Semua';
+                const search = document.getElementById('searchInput').value.toLowerCase();
+                let filtered = products;
+                if (brand !== 'Semua') filtered = filtered.filter(p => p.brand === brand);
+                if (search) filtered = filtered.filter(p => p.model.toLowerCase().includes(search) || p.specs.toLowerCase().includes(search) || p.brand.toLowerCase().includes(search));
+                renderPublicView(filtered);
+            }
+            lucide.createIcons();
+        }
+
+        function renderPublicView(data) {
+            const container = document.getElementById('productContainer');
+            const categoryContainer = document.getElementById('categoryContainer');
+            const brands = ['Semua', ...new Set(products.map(p => p.brand))];
+            
+            if (categoryContainer.children.length !== brands.length) {
+                 categoryContainer.innerHTML = '';
+                 brands.forEach(brand => {
+                    const btn = document.createElement('button');
+                    btn.textContent = brand;
+                    btn.className = `cat-btn px-4 py-1.5 rounded-full text-xs font-bold transition whitespace-nowrap border ${brand === 'Semua' ? 'bg-primary text-white border-primary active-cat' : 'bg-white text-gray-500 border-gray-200 hover:border-primary'}`;
+                    btn.onclick = (e) => {
+                        document.querySelectorAll('.cat-btn').forEach(b => {
+                            b.classList.remove('bg-primary', 'text-white', 'active-cat');
+                            b.classList.add('bg-white', 'text-gray-500');
+                        });
+                        e.target.classList.remove('bg-white', 'text-gray-500');
+                        e.target.classList.add('bg-primary', 'text-white', 'active-cat');
+                        renderApp();
+                    };
+                    categoryContainer.appendChild(btn);
+                });
+            }
+
+            container.innerHTML = '';
+            if (data.length === 0) {
+                document.getElementById('emptyState').classList.remove('hidden');
+            } else {
+                document.getElementById('emptyState').classList.add('hidden');
+                data.forEach(item => {
+                    const waLink = `https://wa.me/${nomorWA}?text=${encodeURIComponent(`Halo, saya mau beli ${item.brand} ${item.model} harga ${formatRupiah(item.price)}`)}`;
+                    const el = document.createElement('div');
+                    el.className = 'bg-white rounded-xl shadow-sm hover:shadow-lg transition border border-gray-100 flex flex-col overflow-hidden h-full group';
+                    el.innerHTML = `
+                        <div class="h-32 bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center relative overflow-hidden">
+                            <div class="absolute inset-0 bg-pattern opacity-10"></div>
+                            <div class="absolute inset-0 bg-gradient-to-t from-white/20 to-transparent"></div>
+                            <i data-lucide="laptop" class="w-14 h-14 text-gray-400 group-hover:scale-110 transition-transform duration-500"></i>
+                            <span class="absolute top-3 left-3 bg-white/90 px-2 py-0.5 rounded text-[10px] font-bold text-primary border border-gray-200 shadow-sm backdrop-blur-sm">${item.brand}</span>
+                        </div>
+                        <div class="p-4 flex flex-col flex-grow">
+                            <h3 class="font-bold text-gray-800 text-sm mb-1 leading-snug group-hover:text-primary transition-colors">${item.model}</h3>
+                            <div class="w-10 h-0.5 bg-secondary/50 mb-3 rounded-full"></div>
+                            <p class="text-xs text-gray-500 mb-4 leading-relaxed line-clamp-3 flex-grow">${item.specs}</p>
+                            <div class="mt-auto pt-3 border-t border-gray-50 flex items-center justify-between">
+                                <div>
+                                    <p class="text-[10px] text-gray-400 mb-0.5">Harga Tunai</p>
+                                    <span class="font-bold text-secondary text-sm md:text-base">${formatRupiah(item.price)}</span>
+                                </div>
+                                <a href="${waLink}" target="_blank" class="bg-primary hover:bg-purple-800 text-white p-2.5 rounded-lg transition shadow-md active:scale-95 flex items-center justify-center">
+                                    <i data-lucide="message-circle" class="w-4 h-4"></i>
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(el);
+                });
+            }
+        }
+
+        function renderAdminTable() {
+            const tbody = document.getElementById('adminTableBody');
+            tbody.innerHTML = '';
+            products.forEach((item) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 transition border-b border-gray-100";
+                tr.innerHTML = `
+                    <td class="px-4 py-3">
+                        <div class="font-bold text-gray-800 text-sm">${item.brand} ${item.model}</div>
+                        <div class="text-xs text-gray-400 truncate max-w-[200px]">${item.specs}</div>
+                    </td>
+                    <td class="px-4 py-3 font-semibold text-secondary text-xs whitespace-nowrap">${formatRupiah(item.price)}</td>
+                    <td class="px-4 py-3 text-center">
+                        <div class="flex items-center justify-center gap-2">
+                            <button class="edit-btn text-blue-500 bg-blue-50 p-1.5 rounded hover:bg-blue-100 transition" data-id="${item.id}"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                            <button class="del-btn text-red-500 bg-red-50 p-1.5 rounded hover:bg-red-100 transition" data-id="${item.id}"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            document.querySelectorAll('.edit-btn').forEach(btn => btn.onclick = () => openEditModal(btn.dataset.id));
+            document.querySelectorAll('.del-btn').forEach(btn => btn.onclick = () => handleDelete(btn.dataset.id));
+            lucide.createIcons();
+        }
+
+        window.saveProduct = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('saveBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = 'Menyimpan...';
+            btn.disabled = true;
+
+            const id = document.getElementById('editId').value;
+            const data = {
+                brand: document.getElementById('inputBrand').value,
+                model: document.getElementById('inputModel').value,
+                specs: document.getElementById('inputSpecs').value,
+                price: parseInt(document.getElementById('inputPrice').value),
+                createdAt: Date.now()
+            };
+
+            try {
+                if (id) {
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id), data);
+                    Swal.fire({ icon: 'success', title: 'Updated!', timer: 1000, showConfirmButton: false });
+                } else {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), data);
+                    Swal.fire({ icon: 'success', title: 'Tersimpan!', timer: 1000, showConfirmButton: false });
+                }
+                closeProductModal();
+            } catch (err) { Swal.fire('Error', err.message, 'error'); } 
+            finally { btn.innerHTML = originalText; btn.disabled = false; }
+        };
+
+        window.importInitialData = async () => {
+            const result = await Swal.fire({ title: 'Import Data Awal?', text: 'Pastikan database kosong biar gak dobel.', icon: 'question', showCancelButton: true });
+            if (result.isConfirmed) {
+                Swal.showLoading();
+                const batchPromises = initialData.map(async (item) => {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), { ...item, createdAt: Date.now() });
+                });
+                await Promise.all(batchPromises);
+                Swal.fire('Selesai!', 'Data berhasil diimport', 'success');
+            }
+        }
+
+        async function handleDelete(id) {
+            const result = await Swal.fire({ title: 'Hapus?', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33' });
+            if (result.isConfirmed) {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id));
+                Swal.fire('Terhapus!', '', 'success');
+            }
+        }
+
+        window.openProductModal = () => {
+            document.getElementById('productModal').classList.remove('hidden');
+            document.getElementById('modalTitle').textContent = 'Tambah Barang';
+            document.getElementById('editId').value = '';
+            document.getElementById('inputBrand').value = 'Lenovo';
+            document.getElementById('inputModel').value = '';
+            document.getElementById('inputSpecs').value = '';
+            document.getElementById('inputPrice').value = '';
+        };
+
+        window.openEditModal = (id) => {
+            const item = products.find(p => p.id === id);
+            if (!item) return;
+            document.getElementById('productModal').classList.remove('hidden');
+            document.getElementById('modalTitle').textContent = 'Edit Barang';
+            document.getElementById('editId').value = id;
+            document.getElementById('inputBrand').value = item.brand;
+            document.getElementById('inputModel').value = item.model;
+            document.getElementById('inputSpecs').value = item.specs;
+            document.getElementById('inputPrice').value = item.price;
+        };
+
+        window.closeProductModal = () => document.getElementById('productModal').classList.add('hidden');
+        window.toggleLoginModal = () => document.getElementById('loginModal').classList.toggle('hidden');
+        
+        window.handleLogin = (e) => {
+            e.preventDefault();
+            const u = document.getElementById('usernameInput').value;
+            const p = document.getElementById('passwordInput').value;
+            if(u === 'admin' && p === 'bismillah') {
+                isAdmin = true;
+                window.toggleLoginModal();
+                updateViewMode();
+                Swal.fire({ icon: 'success', title: 'Mode Admin Aktif', showConfirmButton: false, timer: 1500 });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Gagal', text: 'Cek username/password' });
+            }
+        };
+
+        window.logout = () => { isAdmin = false; updateViewMode(); Swal.fire({ icon: 'success', title: 'Logout Berhasil', timer: 1000, showConfirmButton: false }); };
+
+        window.updateViewMode = () => {
+             const adminPanel = document.getElementById('adminPanel');
             const publicView = document.getElementById('publicView');
             const adminBtn = document.getElementById('adminBtn');
             const logoutBtn = document.getElementById('logoutBtn');
             const searchContainer = document.getElementById('searchContainer');
-
             if(isAdmin) {
                 adminPanel.classList.remove('hidden');
-                publicView.classList.add('hidden'); // Sembunyikan katalog publik saat mode admin
+                publicView.classList.add('hidden');
                 adminBtn.classList.add('hidden');
                 logoutBtn.classList.remove('hidden');
                 searchContainer.classList.add('hidden');
@@ -267,191 +650,13 @@
                 adminBtn.classList.remove('hidden');
                 logoutBtn.classList.add('hidden');
                 searchContainer.classList.remove('hidden');
-                renderPublicView(products);
+                renderApp(); 
             }
-        }
+        };
 
-        // --- CRUD FUNCTIONS (CREATE, READ, UPDATE, DELETE) ---
-
-        // 1. Render Public
-        function renderPublicView(data) {
-            const container = document.getElementById('productContainer');
-            const categoryContainer = document.getElementById('categoryContainer');
-            container.innerHTML = '';
-            
-            // Render Categories
-            const brands = ['All', ...new Set(products.map(p => p.brand))];
-            categoryContainer.innerHTML = '';
-            brands.forEach(brand => {
-                const isActive = brand === 'All'; // Default active logic can be improved
-                const btn = document.createElement('button');
-                btn.textContent = brand === 'All' ? 'Semua' : brand;
-                btn.className = `px-4 py-1.5 rounded-full text-xs font-bold transition whitespace-nowrap border ${isActive ? 'bg-primary text-white border-primary' : 'bg-white text-gray-500 border-gray-200 hover:border-primary'}`;
-                btn.onclick = (e) => filterBrand(brand, e.target);
-                if(brand === 'All') btn.classList.add('active-cat');
-                categoryContainer.appendChild(btn);
-            });
-
-            if(data.length === 0) {
-                document.getElementById('emptyState').classList.remove('hidden');
-            } else {
-                document.getElementById('emptyState').classList.add('hidden');
-                data.forEach(item => {
-                    const waLink = `https://wa.me/${nomorWA}?text=${encodeURIComponent(`Halo, saya mau beli ${item.brand} ${item.model} harga ${formatRupiah(item.price)}`)}`;
-                    
-                    const el = document.createElement('div');
-                    el.className = 'bg-white rounded-xl shadow-sm hover:shadow-lg transition border border-gray-100 flex flex-col overflow-hidden';
-                    el.innerHTML = `
-                        <div class="h-24 bg-gradient-to-r from-gray-100 to-gray-200 flex items-center justify-center relative">
-                            <i data-lucide="laptop" class="w-10 h-10 text-gray-400"></i>
-                            <span class="absolute top-2 left-2 bg-white/80 px-2 py-0.5 rounded text-[10px] font-bold text-primary uppercase tracking-wide border border-gray-200">${item.brand}</span>
-                        </div>
-                        <div class="p-4 flex flex-col flex-grow">
-                            <h3 class="font-bold text-gray-800 text-sm mb-1">${item.model}</h3>
-                            <p class="text-xs text-gray-500 mb-3 leading-relaxed line-clamp-3">${item.specs}</p>
-                            <div class="mt-auto pt-3 border-t border-gray-50 flex items-center justify-between">
-                                <span class="font-bold text-secondary text-sm">${formatRupiah(item.price)}</span>
-                                <a href="${waLink}" target="_blank" class="bg-primary hover:bg-purple-800 text-white p-2 rounded-lg transition">
-                                    <i data-lucide="shopping-cart" class="w-4 h-4"></i>
-                                </a>
-                            </div>
-                        </div>
-                    `;
-                    container.appendChild(el);
-                });
-                lucide.createIcons();
-            }
-        }
-
-        // 2. Render Admin Table
-        function renderAdminTable() {
-            const tbody = document.getElementById('adminTableBody');
-            tbody.innerHTML = '';
-            products.forEach((item, index) => {
-                const tr = document.createElement('tr');
-                tr.className = "hover:bg-gray-50 transition border-b border-gray-100";
-                tr.innerHTML = `
-                    <td class="px-4 py-3">
-                        <div class="font-bold text-gray-800">${item.brand} ${item.model}</div>
-                        <div class="text-xs text-gray-400 truncate max-w-[200px]">${item.specs}</div>
-                    </td>
-                    <td class="px-4 py-3 font-semibold text-secondary text-xs whitespace-nowrap">${formatRupiah(item.price)}</td>
-                    <td class="px-4 py-3 text-center">
-                        <div class="flex items-center justify-center gap-2">
-                            <button onclick="editProduct(${index})" class="text-blue-500 hover:text-blue-700 bg-blue-50 p-1.5 rounded-md"><i data-lucide="pencil" class="w-4 h-4"></i></button>
-                            <button onclick="deleteProduct(${index})" class="text-red-500 hover:text-red-700 bg-red-50 p-1.5 rounded-md"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                        </div>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-            lucide.createIcons();
-        }
-
-        // 3. Add/Edit Logic
-        function openProductModal() {
-            document.getElementById('productModal').classList.remove('hidden');
-            document.getElementById('modalTitle').textContent = 'Tambah Barang';
-            document.getElementById('editIndex').value = '-1';
-            // Reset Form
-            document.getElementById('inputBrand').value = 'Lenovo';
-            document.getElementById('inputModel').value = '';
-            document.getElementById('inputSpecs').value = '';
-            document.getElementById('inputPrice').value = '';
-        }
-
-        function closeProductModal() {
-            document.getElementById('productModal').classList.add('hidden');
-        }
-
-        function editProduct(index) {
-            const item = products[index];
-            document.getElementById('productModal').classList.remove('hidden');
-            document.getElementById('modalTitle').textContent = 'Edit Barang';
-            document.getElementById('editIndex').value = index;
-            
-            document.getElementById('inputBrand').value = item.brand;
-            document.getElementById('inputModel').value = item.model;
-            document.getElementById('inputSpecs').value = item.specs;
-            document.getElementById('inputPrice').value = item.price;
-        }
-
-        function saveProduct(e) {
-            e.preventDefault();
-            const index = parseInt(document.getElementById('editIndex').value);
-            const brand = document.getElementById('inputBrand').value;
-            const model = document.getElementById('inputModel').value;
-            const specs = document.getElementById('inputSpecs').value;
-            const price = parseInt(document.getElementById('inputPrice').value);
-
-            const newItem = { brand, model, specs, price };
-
-            if(index === -1) {
-                // Add New
-                products.unshift(newItem); // Add to top
-                Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Barang ditambahkan!', timer: 1000, showConfirmButton: false });
-            } else {
-                // Update Existing
-                products[index] = newItem;
-                Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Barang diupdate!', timer: 1000, showConfirmButton: false });
-            }
-
-            saveToLocal();
-            closeProductModal();
-            renderAdminTable();
-        }
-
-        function deleteProduct(index) {
-            Swal.fire({
-                title: 'Hapus barang?',
-                text: "Data tidak bisa dikembalikan!",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Ya, Hapus!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    products.splice(index, 1);
-                    saveToLocal();
-                    renderAdminTable();
-                    Swal.fire('Terhapus!', 'Barang telah dihapus.', 'success');
-                }
-            })
-        }
-
-        // --- FILTER & SEARCH ---
-        function filterBrand(brand, btnElement) {
-            // UI Update
-            document.querySelectorAll('#categoryContainer button').forEach(b => {
-                b.classList.remove('bg-primary', 'text-white', 'border-primary');
-                b.classList.add('bg-white', 'text-gray-500', 'border-gray-200');
-            });
-            btnElement.classList.remove('bg-white', 'text-gray-500', 'border-gray-200');
-            btnElement.classList.add('bg-primary', 'text-white', 'border-primary');
-
-            // Logic
-            if(brand === 'All') {
-                renderPublicView(products);
-            } else {
-                renderPublicView(products.filter(p => p.brand === brand));
-            }
-        }
-
-        document.getElementById('searchInput').addEventListener('input', (e) => {
-            const term = e.target.value.toLowerCase();
-            const filtered = products.filter(p => 
-                p.model.toLowerCase().includes(term) || 
-                p.specs.toLowerCase().includes(term) ||
-                p.brand.toLowerCase().includes(term)
-            );
-            renderPublicView(filtered);
-        });
-
-        // --- INIT ---
-        renderPublicView(products);
-
+        window.formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+        document.getElementById('searchInput').addEventListener('input', renderApp);
+        initApp();
     </script>
 </body>
 </html>
